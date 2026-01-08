@@ -1,16 +1,8 @@
-import os
 from setuptools import setup, find_packages
-
-# Read version from __init__.py
-with open(os.path.join("Sources", "CopyLab", "__init__.py"), "r") as f:
-    for line in f:
-        if line.startswith("__version__"):
-            version = line.split("=")[1].strip().strip('"')
-            break
 
 setup(
     name="copylab",
-    version=version,
+    version="1.0.1",
     description="CopyLab Python SDK for secure notification management",
     author="CopyLab",
     package_dir={"": "Sources"},
