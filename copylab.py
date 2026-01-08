@@ -23,11 +23,122 @@ Usage:
         message=result["message"],
         data=result["data"]
     )
+    
+Logging:
+    CopyLab uses Python's logging module. Configure log level to control verbosity:
+    
+    import logging
+    logging.getLogger('copylab').setLevel(logging.DEBUG)  # Verbose output
+    logging.getLogger('copylab').setLevel(logging.WARNING)  # Errors only
 """
 
 from firebase_admin import firestore, credentials, initialize_app, get_app
 import firebase_admin
 import os
+import logging
+import time
+from functools import wraps
+
+# Configure CopyLab logger
+logger = logging.getLogger('copylab')
+
+# Detect if running in Google Cloud Functions environment
+_IS_CLOUD_FUNCTION = os.environ.get('FUNCTION_TARGET') is not None or os.environ.get('K_SERVICE') is not None
+
+# Add a default handler if none exists (prevents "No handler found" warnings)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    
+    if _IS_CLOUD_FUNCTION:
+        # Cloud Functions: Use structured logging format for better Firebase Console display
+        # Logs with severity levels appear properly in Firebase Console > Functions > Logs
+        handler.setFormatter(logging.Formatter(
+            '[CopyLab] %(levelname)s: %(message)s'
+        ))
+    else:
+        # Local development: Include timestamps
+        handler.setFormatter(logging.Formatter(
+            '%(asctime)s [CopyLab] %(levelname)s: %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        ))
+    
+    logger.addHandler(handler)
+    
+    # Set log level from environment variable or default to INFO
+    log_level = os.environ.get('COPYLAB_LOG_LEVEL', 'INFO').upper()
+    logger.setLevel(getattr(logging, log_level, logging.INFO))
+
+
+def _log_performance(func):
+    """Decorator to log function execution time for performance monitoring."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        func_name = func.__name__
+        
+        # Log function entry with key arguments
+        arg_summary = _summarize_args(args, kwargs, func_name)
+        logger.debug(f"→ {func_name}({arg_summary})")
+        
+        try:
+            result = func(*args, **kwargs)
+            elapsed_ms = (time.time() - start_time) * 1000
+            
+            # Log success with timing
+            result_summary = _summarize_result(result, func_name)
+            logger.debug(f"← {func_name} completed in {elapsed_ms:.2f}ms{result_summary}")
+            
+            # Warn if operation is slow
+            if elapsed_ms > 1000:
+                logger.warning(f"⚠️ Slow operation: {func_name} took {elapsed_ms:.2f}ms")
+            
+            return result
+        except Exception as e:
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.error(f"✗ {func_name} failed after {elapsed_ms:.2f}ms: {e}")
+            raise
+    
+    return wrapper
+
+
+def _summarize_args(args, kwargs, func_name: str) -> str:
+    """Create a concise summary of function arguments for logging."""
+    parts = []
+    
+    # Handle common function signatures
+    if func_name in ('generate_notification', 'get_random_template', 'get_placement_config'):
+        if args:
+            parts.append(f"placement_id='{args[0]}'")
+        elif 'placement_id' in kwargs:
+            parts.append(f"placement_id='{kwargs['placement_id']}'")
+    elif func_name == 'get_topic_subscribers':
+        if args:
+            parts.append(f"topic_id='{args[0]}'")
+        elif 'topic_id' in kwargs:
+            parts.append(f"topic_id='{kwargs['topic_id']}'")
+    elif func_name == 'get_collection_ref':
+        if args:
+            parts.append(f"collection='{args[0]}'")
+    
+    return ', '.join(parts) if parts else '...'
+
+
+def _summarize_result(result, func_name: str) -> str:
+    """Create a concise summary of function result for logging."""
+    if result is None:
+        return " → None"
+    
+    if func_name == 'get_topic_subscribers' and isinstance(result, list):
+        return f" → {len(result)} subscribers"
+    elif func_name == 'get_random_template' and isinstance(result, dict):
+        template_name = result.get('name', 'Unknown')
+        return f" → template '{template_name}'"
+    elif func_name == 'generate_notification' and isinstance(result, dict):
+        used = result.get('template_used', False)
+        name = result.get('template_name', 'N/A')
+        return f" → template_used={used}, name='{name}'"
+    
+    return ""
 
 # Global configuration
 _CONFIG = {
@@ -51,10 +162,13 @@ def configure(service_account_path: str = None, api_key: str = None, app_id: str
     global _CONFIG, _COPYLAB_APP
     if service_account_path:
         _CONFIG['service_account_path'] = service_account_path
+        logger.info(f"Configured service account: {os.path.basename(service_account_path)}")
     if api_key:
         _CONFIG['api_key'] = api_key
+        logger.info(f"Configured API key: {api_key[:10]}...")
     if app_id:
         _CONFIG['app_id'] = app_id
+        logger.info(f"Configured app_id: {app_id}")
         
     # Reset app to force re-initialization
     _COPYLAB_APP = None
@@ -78,12 +192,14 @@ def get_app_id() -> str:
 
 
 
+@_log_performance
 def get_db():
     """Get CopyLab Firestore database client."""
     global _COPYLAB_APP
     
     # If app already initialized, return client
     if _COPYLAB_APP:
+        logger.debug("Using cached CopyLab app instance")
         return firestore.client(app=_COPYLAB_APP)
         
     try:
@@ -93,6 +209,7 @@ def get_db():
         # Check if app already exists in firebase_admin (singleton check)
         try:
             _COPYLAB_APP = get_app(app_name)
+            logger.debug(f"Found existing Firebase app: {app_name}")
             return firestore.client(app=_COPYLAB_APP)
         except ValueError:
             # App not initialized yet
@@ -107,25 +224,28 @@ def get_db():
             default_path = os.path.join(current_dir, 'copylab-service-account.json')
             if os.path.exists(default_path):
                 sa_path = default_path
+                logger.debug(f"Auto-discovered service account: {default_path}")
 
         if sa_path and os.path.exists(sa_path):
             cred = credentials.Certificate(sa_path)
             _COPYLAB_APP = initialize_app(cred, name=app_name)
-            print(f"✅ CopyLab: Initialized with service account: {os.path.basename(sa_path)}")
+            logger.info(f"✅ Initialized with service account: {os.path.basename(sa_path)}")
             return firestore.client(app=_COPYLAB_APP)
             
         # Fallback: Use default app (Nomigo project) if no specific config
         # This handles backward compatibility
         try:
             from .config import db
+            logger.debug("Using fallback config.db")
             return db
         except ImportError:
             if not firebase_admin._apps:
                 firebase_admin.initialize_app()
+            logger.debug("Using default Firebase app")
             return firestore.client()
             
     except Exception as e:
-        print(f"⚠️ CopyLab: Error initializing DB: {e}")
+        logger.error(f"Error initializing DB: {e}")
         # Last resort fallback
         if not firebase_admin._apps:
             firebase_admin.initialize_app()
@@ -142,13 +262,15 @@ def get_collection_ref(collection_name: str):
     app_id = get_app_id()
     
     if app_id and app_id != 'unknown':
+        logger.debug(f"Collection ref: apps/{app_id}/{collection_name}")
         return db.collection('apps').document(app_id).collection(collection_name)
     else:
         # Fallback to root collection if no valid keys (backward compatibility)
-        print(f"⚠️ CopyLab: No valid API Key configured. Using root collection for '{collection_name}'.")
+        logger.warning(f"No valid API Key configured. Using root collection for '{collection_name}'.")
         return db.collection(collection_name)
 
 
+@_log_performance
 def get_topic_subscribers(topic_id: str) -> list[str]:
     """
     Get list of user IDs subscribed to a CopyLab topic.
@@ -160,13 +282,13 @@ def get_topic_subscribers(topic_id: str) -> list[str]:
         
         if doc.exists:
             subscriber_ids = doc.to_dict().get('subscriber_ids', [])
-            print(f"📊 CopyLab: Found {len(subscriber_ids)} subscribers for topic {topic_id}")
+            logger.info(f"📊 Found {len(subscriber_ids)} subscribers for topic '{topic_id}'")
             return subscriber_ids
         else:
-            print(f"⚠️ CopyLab: No subscribers found for topic {topic_id}")
+            logger.warning(f"No subscribers found for topic '{topic_id}'")
             return []
     except Exception as e:
-        print(f"⚠️ CopyLab: Error fetching topic subscribers: {e}")
+        logger.error(f"Error fetching topic subscribers for '{topic_id}': {e}")
         return []
 
 # ... (Conditional logic helpers unchanged)
@@ -421,11 +543,12 @@ def get_random_template(placement_id: str, variables: dict = None, eligible_temp
                     return _weighted_random_choice(eligible)
             
     except Exception as e:
-        print(f"⚠️ CopyLab: Error fetching template for {placement_id}: {e}")
+        logger.error(f"Error fetching template for placement '{placement_id}': {e}")
     
     return None
 
 
+@_log_performance
 def get_placement_config(placement_id: str) -> dict | None:
     """
     Fetches the placement configuration including variables and default values.
@@ -444,7 +567,7 @@ def get_placement_config(placement_id: str) -> dict | None:
         
         if doc.exists:
             data = doc.to_dict()
-            return {
+            config = {
                 'id': placement_id,
                 'name': data.get('name', placement_id),
                 'variables': data.get('variables', []),
@@ -453,8 +576,12 @@ def get_placement_config(placement_id: str) -> dict | None:
                 'templateFilters': data.get('templateFilters', []),
                 'activeTemplateId': data.get('activeTemplateId')
             }
+            logger.debug(f"Loaded placement config for '{placement_id}': {len(config.get('variables', []))} variables")
+            return config
+        else:
+            logger.warning(f"Placement '{placement_id}' not found in Firestore")
     except Exception as e:
-        print(f"⚠️ CopyLab: Error fetching placement {placement_id}: {e}")
+        logger.error(f"Error fetching placement '{placement_id}': {e}")
     
     return None
 
@@ -497,7 +624,7 @@ def apply_template(template_string: str, variables: dict, defaults: dict = None)
         else:
             # Keep placeholder if no value found
             value = placeholder
-            print(f"⚠️ CopyLab: No value provided for {placeholder}")
+            logger.warning(f"No value provided for variable {placeholder}")
         
         result = result.replace(placeholder, value)
     
@@ -638,7 +765,7 @@ def generate_notification(
         }
     else:
         # No template found - use fallbacks
-        print(f"⚠️ CopyLab: No active template for {placement_id}, using fallbacks")
+        logger.warning(f"No active template for placement '{placement_id}', using fallbacks")
         
         # Try to get defaults from placement config if possible (even if no template active)
         placement_config = get_placement_config(placement_id)
@@ -689,7 +816,7 @@ def generate_notification_safe(
             fallback_message=fallback_message
         )
     except Exception as e:
-        print(f"⚠️ CopyLab: Error generating notification: {e}")
+        logger.error(f"Error generating notification for '{placement_id}': {e}")
         return {
             'title': fallback_title,
             'message': fallback_message,
