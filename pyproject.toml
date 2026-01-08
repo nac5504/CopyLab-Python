@@ -1,0 +1,13 @@
+[project]
+name = "copylab-functions"
+version = "1.0.0"
+description = "CopyLab Cloud Functions API"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = ["src"]
+
+dependencies = [
+    "firebase-admin>=6.0.0",
+    "firebase-functions>=0.1.0",
+]
