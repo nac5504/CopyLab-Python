@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="copylab",
-    version="1.0.1",
+    version="1.0.2",
     description="CopyLab Python SDK for secure notification management",
     author="CopyLab",
     package_dir={"": "Sources"},
