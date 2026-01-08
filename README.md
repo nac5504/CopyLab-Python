@@ -1,74 +1,43 @@
 # CopyLab Python SDK
 
-A Python SDK for generating dynamic notification content from CopyLab templates on your backend.
+A lightweight Python SDK for integrating with the CopyLab notification system using secure API calls.
 
 ## Installation
 
-### Via pip
-
-Install the latest version directly from GitHub:
-
 ```bash
-pip install git+https://github.com/nac5504/CopyLab-Python.git
+pip install -e /path/to/python_sdk
+```
+
+Or with pip from git:
+```bash
+pip install git+https://github.com/nac5504/CopyLab.git#subdirectory=python_sdk
 ```
 
 ## Usage
 
-### 1. Configuration
-
-Initialize the SDK with your credentials. You can provide a service account path directly or rely on environment auto-discovery.
-
 ```python
-import copylab
+from CopyLab import CopyLab
 
-# Option A: Explicit Service Account
-copylab.configure(
-    service_account_path="path/to/serviceAccountKey.json",
-    app_id="my-app-id"
+# Configure with your API key
+CopyLab.configure(api_key="cl_yourapp_xxxx...")
+
+# Identify user (optional but recommended)
+CopyLab.identify(user_id="user123")
+
+# Generate a notification
+result = CopyLab.generate_notification(
+    placement_id="welcome_message",
+    variables={"user_name": "John"}
 )
+print(result["title"])   # "Welcome, John!"
+print(result["message"]) # "We're glad you're here."
 
-# Option B: API Key (if supported by your setup)
-copylab.configure(api_key="cl_my_app_id_xxxx")
-```
+# Topic subscriptions
+CopyLab.subscribe_to_topic("daily_updates")
+CopyLab.unsubscribe_from_topic("daily_updates")
+subscribers = CopyLab.get_topic_subscribers("daily_updates")
 
-### 2. Generating Notifications
-
-Fetch a template and generate personalized content for a user.
-
-```python
-# Generate content for a specific placement
-notification = copylab.generate_notification(
-    placement_id="chat_message",
-    variables={
-        "sender_name": "Sarah",
-        "message_preview": "Hey, are you going to the event?"
-    },
-    # Optional: Fallback if no template is active
-    fallback_title="New Message",
-    fallback_message="You have a new message from Sarah."
-)
-
-if notification["template_used"]:
-    print(f"Generated: {notification['title']} - {notification['message']}")
-else:
-    print("Using fallback content")
-
-# Use the result to send your push notification
-# send_push(title=notification['title'], body=notification['message'], data=notification['data'])
-```
-
-### 3. Quick Notify
-
-For simple use cases, you can use the shorthand `notify` function:
-
-```python
-result = copylab.notify("daily_reminder", streak_days=5, user_name="Alex")
-```
-
-## Updating
-
-To update the SDK to the latest version, add the `--upgrade` flag:
-
-```bash
-pip install --upgrade git+https://github.com/nac5504/CopyLab-Python.git
+# Analytics
+CopyLab.log_app_open()
+CopyLab.log_push_open(notification_id="notif_123")
 ```

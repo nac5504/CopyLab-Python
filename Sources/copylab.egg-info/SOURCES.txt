@@ -1,0 +1,9 @@
+README.md
+setup.py
+Sources/CopyLab/CopyLab.py
+Sources/CopyLab/__init__.py
+Sources/copylab.egg-info/PKG-INFO
+Sources/copylab.egg-info/SOURCES.txt
+Sources/copylab.egg-info/dependency_links.txt
+Sources/copylab.egg-info/requires.txt
+Sources/copylab.egg-info/top_level.txt
