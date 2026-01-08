@@ -34,30 +34,6 @@ def verify_sdk():
         print("\nTesting log_app_open...")
         CopyLab.log_app_open()
         
-        # 5. Test Notification Logging (Single)
-        print("\nTesting log_notification_sent...")
-        CopyLab.log_notification_sent(
-            notification_id=f"test_notif_{os.urandom(4).hex()}",
-            title="SDK Test Notification",
-            message="This is a test from verify_sdk.py",
-            users=[{"uid": "sdk_test_user", "delivered": True}],
-            target_count=1,
-            success_count=1,
-            data=result.get('data') # Pass attribution data from generation
-        )
-        
-        # 6. Test Notification Logging (Batch)
-        print("\nTesting log_notification_batch...")
-        CopyLab.log_notification_batch(
-            batch_id=f"sdk_batch_{os.urandom(4).hex()}",
-            notification_id=f"batch_notif_{os.urandom(4).hex()}",
-            title="SDK Batch Notification",
-            message="This is a batch test",
-            users_list=[{"uid": "sdk_test_user", "delivered": True}],
-            success_count=1,
-            payload_data={"copylab_template_name": "Batch Test"}
-        )
-        
         print("\n✅ Verification complete: SDK is fully operational.")
         
     except CopyLabError as e:

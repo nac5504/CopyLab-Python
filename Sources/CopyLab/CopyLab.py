@@ -294,3 +294,94 @@ class CopyLab:
         
         cls._make_request("sync_notification_permission", body=body)
         print(f"📊 CopyLab: Synced notification status: {notification_status}")
+
+    @classmethod
+    def log_notification_sent(
+        cls,
+        notification_id: str,
+        title: str,
+        message: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
+        users: Optional[List[Dict[str, Any]]] = None,
+        topic: Optional[str] = None,
+        type: str = "targeted",
+        target_count: Optional[int] = None,
+        success_count: Optional[int] = None,
+        failure_count: Optional[int] = None
+    ):
+        """
+        Log a confirmed notification sent event.
+        
+        Args:
+            notification_id: Unique ID for the notification
+            title: Notification title
+            message: Notification message
+            data: Payload data (including attribution)
+            users: List of user dicts with {uid, name, delivered}
+            topic: Topic ID if applicable
+            type: Notification type (targeted, broadcast, etc)
+            target_count: Number of users targeted
+            success_count: Number of successful sends
+            failure_count: Number of failed sends
+        """
+        body = {
+            "notification_id": notification_id,
+            "title": title,
+            "type": type,
+            "data": data or {}
+        }
+        
+        if message:
+            body["message"] = message
+        if users:
+            body["users"] = users
+        if topic:
+            body["topic"] = topic
+        if target_count is not None:
+            body["target_count"] = target_count
+        if success_count is not None:
+            body["success_count"] = success_count
+        if failure_count is not None:
+            body["failure_count"] = failure_count
+            
+        cls._make_request("log_notification_sent", body=body)
+        print(f"📊 CopyLab: Logged notification sent: {notification_id}")
+
+    @classmethod
+    def log_notification_batch(
+        cls,
+        batch_id: str,
+        notification_id: str,
+        users_list: List[Dict[str, Any]],
+        title: str,
+        message: str,
+        payload_data: Optional[Dict[str, Any]] = None,
+        success_count: int = 0,
+        failure_count: int = 0
+    ):
+        """
+        Log a batch of notifications for aggregated analytics.
+        
+        Args:
+            batch_id: Unique ID for the batch (e.g. "daily_updates_2023-10-27")
+            notification_id: Unique ID for this specific notification send
+            users_list: List of user dicts with {uid, name, delivered}
+            title: Notification title
+            message: Notification message
+            payload_data: Payload data (including attribution)
+            success_count: Number of successful sends in this batch chunk
+            failure_count: Number of failed sends in this batch chunk
+        """
+        body = {
+            "batch_id": batch_id,
+            "notification_id": notification_id,
+            "users_list": users_list,
+            "title": title,
+            "message": message,
+            "payload_data": payload_data or {},
+            "success_count": success_count,
+            "failure_count": failure_count
+        }
+        
+        cls._make_request("log_notification_batch", body=body)
+        print(f"📊 CopyLab: Logged batch notification chunk: {batch_id}")
