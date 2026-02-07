@@ -73,7 +73,7 @@ class CopyLab:
         print("👤 CopyLab: Logged out user")
     
     @classmethod
-    def _make_request(
+    def make_request(
         cls,
         endpoint: str,
         method: str = "POST",
@@ -143,7 +143,7 @@ class CopyLab:
         if fallback_message:
             body["fallback_message"] = fallback_message
         
-        return cls._make_request("generate_notification", body=body)
+        return cls.make_request("generate_notification", body=body)
     
     # =========================================================================
     # Topic Subscriptions
@@ -160,7 +160,7 @@ class CopyLab:
         Returns:
             List of subscriber user IDs
         """
-        result = cls._make_request(
+        result = cls.make_request(
             "get_topic_subscribers",
             method="GET",
             params={"topic_id": topic_id}
@@ -184,7 +184,7 @@ class CopyLab:
         if not body["user_id"]:
             raise CopyLabError("No user_id provided and no user identified. Call CopyLab.identify() first.")
         
-        cls._make_request("subscribe_to_topic", body=body)
+        cls.make_request("subscribe_to_topic", body=body)
         print(f"📊 CopyLab: Subscribed to topic {topic_id}")
     
     @classmethod
@@ -204,7 +204,7 @@ class CopyLab:
         if not body["user_id"]:
             raise CopyLabError("No user_id provided and no user identified. Call CopyLab.identify() first.")
         
-        cls._make_request("unsubscribe_from_topic", body=body)
+        cls.make_request("unsubscribe_from_topic", body=body)
         print(f"📊 CopyLab: Unsubscribed from topic {topic_id}")
     
     # =========================================================================
@@ -245,7 +245,7 @@ class CopyLab:
         if template_id:
             body["template_id"] = template_id
         
-        cls._make_request("log_push_open", body=body)
+        cls.make_request("log_push_open", body=body)
         print("📊 CopyLab: Logged push_open event")
     
     @classmethod
@@ -265,7 +265,7 @@ class CopyLab:
         if not body["user_id"]:
             raise CopyLabError("No user_id provided and no user identified.")
         
-        cls._make_request("log_app_open", body=body)
+        cls.make_request("log_app_open", body=body)
         print("📱 CopyLab: Logged app open")
     
     @classmethod
@@ -292,7 +292,7 @@ class CopyLab:
         if not body["user_id"]:
             raise CopyLabError("No user_id provided and no user identified.")
         
-        cls._make_request("sync_notification_permission", body=body)
+        cls.make_request("sync_notification_permission", body=body)
         print(f"📊 CopyLab: Synced notification status: {notification_status}")
 
     @classmethod
@@ -344,7 +344,7 @@ class CopyLab:
         if failure_count is not None:
             body["failure_count"] = failure_count
             
-        cls._make_request("log_notification_sent", body=body)
+        cls.make_request("log_notification_sent", body=body)
         print(f"📊 CopyLab: Logged notification sent: {notification_id}")
 
     @classmethod
@@ -383,5 +383,5 @@ class CopyLab:
             "failure_count": failure_count
         }
         
-        cls._make_request("log_notification_batch", body=body)
+        cls.make_request("log_notification_batch", body=body)
         print(f"📊 CopyLab: Logged batch notification chunk: {batch_id}")

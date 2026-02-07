@@ -58,6 +58,19 @@ def verify_sdk():
             payload_data={"copylab_template_name": "Batch Test"}
         )
         
+        # 7. Test Public make_request
+        print("\nTesting public make_request...")
+        try:
+            # We'll use a simple GET request that doesn't side-effect much, or just check that it doesn't crash on a known endpoint
+            # Since we don't have a safe read-only endpoint that guaranteed 200 without setup, let's just try to call it and catch the error if any,
+            # ensuring the METHOD itself is accessible.
+            # Actually, "get_topic_subscribers" is a safe read check even if topic doesn't exist.
+            res = CopyLab.make_request("get_topic_subscribers", method="GET", params={"topic_id": "non_existent_topic"})
+            print(f"make_request successful. Result keys: {list(res.keys())}")
+        except CopyLabError as e:
+            # Even an API error means the SDK method worked to send the request
+            print(f"make_request executed (API returned error, which is fine): {e}")
+
         print("\n✅ Verification complete: SDK is fully operational.")
         
     except CopyLabError as e:
