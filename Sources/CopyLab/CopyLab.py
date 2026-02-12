@@ -151,6 +151,7 @@ class CopyLab:
         placement_id: str,
         user_ids: Optional[List[str]] = None,
         topic_id: Optional[str] = None,
+        exclude_user_ids: Optional[List[str]] = None,
         variables: Optional[Dict[str, str]] = None,
         data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
@@ -161,6 +162,7 @@ class CopyLab:
             placement_id: The notification placement ID (e.g., "daily_digest")
             user_ids: List of user IDs to send to (required if topic_id not provided)
             topic_id: Topic ID to send to all subscribers (alternative to user_ids)
+            exclude_user_ids: Optional list of user IDs to exclude from sending
             variables: Template variables to substitute
             data: Additional data payload
 
@@ -183,11 +185,14 @@ class CopyLab:
             body["user_ids"] = user_ids
         if topic_id:
             body["topic_id"] = topic_id
+        if exclude_user_ids:
+            body["exclude_user_ids"] = exclude_user_ids
 
         result = cls.make_request("send_notification_to_users", body=body)
 
         target = f"topic '{topic_id}'" if topic_id else f"{len(user_ids)} user(s)"
-        print(f"📨 CopyLab: Sent notification to {target}")
+        exclusions = f" (excluding {len(exclude_user_ids)})" if exclude_user_ids else ""
+        print(f"📨 CopyLab: Sent notification to {target}{exclusions}")
 
         return result
 
