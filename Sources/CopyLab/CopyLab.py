@@ -144,68 +144,129 @@ class CopyLab:
             body["fallback_message"] = fallback_message
         
         return cls.make_request("generate_notification", body=body)
-    
+
+    @classmethod
+    def send_notification_to_users(
+        cls,
+        placement_id: str,
+        user_ids: Optional[List[str]] = None,
+        topic_id: Optional[str] = None,
+        variables: Optional[Dict[str, str]] = None,
+        data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Generate and send notification to specific users or a topic.
+
+        Args:
+            placement_id: The notification placement ID (e.g., "daily_digest")
+            user_ids: List of user IDs to send to (required if topic_id not provided)
+            topic_id: Topic ID to send to all subscribers (alternative to user_ids)
+            variables: Template variables to substitute
+            data: Additional data payload
+
+        Returns:
+            Dict with send results including success/failure counts
+
+        Raises:
+            CopyLabError: If neither user_ids nor topic_id is provided
+        """
+        if not user_ids and not topic_id:
+            raise CopyLabError("Either user_ids or topic_id is required")
+
+        body = {
+            "placement_id": placement_id,
+            "variables": variables or {},
+            "data": data or {}
+        }
+
+        if user_ids:
+            body["user_ids"] = user_ids
+        if topic_id:
+            body["topic_id"] = topic_id
+
+        result = cls.make_request("send_notification_to_users", body=body)
+
+        target = f"topic '{topic_id}'" if topic_id else f"{len(user_ids)} user(s)"
+        print(f"📨 CopyLab: Sent notification to {target}")
+
+        return result
+
     # =========================================================================
     # Topic Subscriptions
     # =========================================================================
     
     @classmethod
-    def get_topic_subscribers(cls, topic_id: str) -> List[str]:
+    def get_topic_subscribers(cls, topic_id: str, topic_name: Optional[str] = None) -> List[str]:
         """
         Get list of user IDs subscribed to a topic.
-        
+
         Args:
             topic_id: The topic ID
-            
+            topic_name: Optional topic name for display/logging
+
         Returns:
             List of subscriber user IDs
         """
+        params = {"topic_id": topic_id}
+        if topic_name:
+            params["topic_name"] = topic_name
+
         result = cls.make_request(
             "get_topic_subscribers",
             method="GET",
-            params={"topic_id": topic_id}
+            params=params
         )
         return result.get("subscriber_ids", [])
     
     @classmethod
-    def subscribe_to_topic(cls, topic_id: str, user_id: Optional[str] = None):
+    def subscribe_to_topic(cls, topic_id: str, user_id: Optional[str] = None, topic_name: Optional[str] = None):
         """
         Subscribe a user to a topic.
-        
+
         Args:
             topic_id: The topic ID
             user_id: User ID (uses identified user if not provided)
+            topic_name: Optional topic name for display/logging
         """
         body = {
             "topic_id": topic_id,
             "user_id": user_id or cls._user_id
         }
-        
+
         if not body["user_id"]:
             raise CopyLabError("No user_id provided and no user identified. Call CopyLab.identify() first.")
-        
+
+        if topic_name:
+            body["topic_name"] = topic_name
+
         cls.make_request("subscribe_to_topic", body=body)
-        print(f"📊 CopyLab: Subscribed to topic {topic_id}")
+        display_name = topic_name if topic_name else topic_id
+        print(f"📊 CopyLab: Subscribed to topic {display_name}")
     
     @classmethod
-    def unsubscribe_from_topic(cls, topic_id: str, user_id: Optional[str] = None):
+    def unsubscribe_from_topic(cls, topic_id: str, user_id: Optional[str] = None, topic_name: Optional[str] = None):
         """
         Unsubscribe a user from a topic.
-        
+
         Args:
             topic_id: The topic ID
             user_id: User ID (uses identified user if not provided)
+            topic_name: Optional topic name for display/logging
         """
         body = {
             "topic_id": topic_id,
             "user_id": user_id or cls._user_id
         }
-        
+
         if not body["user_id"]:
             raise CopyLabError("No user_id provided and no user identified. Call CopyLab.identify() first.")
-        
+
+        if topic_name:
+            body["topic_name"] = topic_name
+
         cls.make_request("unsubscribe_from_topic", body=body)
-        print(f"📊 CopyLab: Unsubscribed from topic {topic_id}")
+        display_name = topic_name if topic_name else topic_id
+        print(f"📊 CopyLab: Unsubscribed from topic {display_name}")
     
     # =========================================================================
     # Analytics
