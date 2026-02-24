@@ -197,6 +197,89 @@ class CopyLab:
         return result
 
     # =========================================================================
+    # SMS
+    # =========================================================================
+
+    @classmethod
+    def register_phone_number(
+        cls,
+        phone_number: str,
+        user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Register a phone number for a user (used for SMS delivery).
+
+        Args:
+            phone_number: Phone number in E.164 format (e.g. "+14155552671")
+            user_id: User ID to register for. Defaults to the identified user.
+
+        Returns:
+            Dict with success status and phone_count
+
+        Raises:
+            CopyLabError: If no user is identified and user_id is not provided
+        """
+        uid = user_id or cls._user_id
+        if not uid:
+            raise CopyLabError("No user identified. Call CopyLab.identify() or pass user_id.")
+
+        result = cls.make_request("register_phone_number", body={
+            "user_id": uid,
+            "phone_number": phone_number
+        })
+
+        print(f"📱 CopyLab: Phone number registered for user {uid}")
+        return result
+
+    @classmethod
+    def send_sms_to_users(
+        cls,
+        placement_id: str,
+        user_ids: Optional[List[str]] = None,
+        topic_id: Optional[str] = None,
+        exclude_user_ids: Optional[List[str]] = None,
+        variables: Optional[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
+        """
+        Send an SMS to specific users or a topic using an SMS placement template.
+
+        Args:
+            placement_id: The SMS placement ID (references sms_templates collection)
+            user_ids: List of user IDs to send to (required if topic_id not provided)
+            topic_id: Topic ID to send to all subscribers (alternative to user_ids)
+            exclude_user_ids: Optional list of user IDs to exclude
+            variables: Template variables to substitute into the SMS body
+
+        Returns:
+            Dict with send results including success/failure counts
+
+        Raises:
+            CopyLabError: If neither user_ids nor topic_id is provided
+        """
+        if not user_ids and not topic_id:
+            raise CopyLabError("Either user_ids or topic_id is required")
+
+        body: Dict[str, Any] = {
+            "placement_id": placement_id,
+            "variables": variables or {}
+        }
+
+        if user_ids:
+            body["user_ids"] = user_ids
+        if topic_id:
+            body["topic_id"] = topic_id
+        if exclude_user_ids:
+            body["exclude_user_ids"] = exclude_user_ids
+
+        result = cls.make_request("send_sms_to_users", body=body)
+
+        target = f"topic '{topic_id}'" if topic_id else f"{len(user_ids)} user(s)"
+        exclusions = f" (excluding {len(exclude_user_ids)})" if exclude_user_ids else ""
+        print(f"💬 CopyLab: Sent SMS to {target}{exclusions}")
+
+        return result
+
+    # =========================================================================
     # Topic Subscriptions
     # =========================================================================
     
